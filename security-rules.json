@@ -3,20 +3,26 @@
     "chats": {
       "$chatId": {
         ".read": "auth != null || root.child('chatKeys').child($chatId).exists()",
-        ".write": "auth != null || (newData.hasChildren(['text', 'sender']) && newData.child('sender').val() == 'user')",
+        ".write": "auth != null",
+        
         "messages": {
           "$messageId": {
-            ".validate": "newData.hasChildren(['text', 'sender', 'timestamp'])"
+            ".read": "auth != null || root.child('chatKeys').child($chatId).exists()",
+            ".write": "auth != null || (newData.hasChildren(['text', 'sender', 'timestamp']) && newData.child('sender').val() == 'user')",
+            ".validate": "newData.hasChildren(['text', 'sender', 'timestamp']) && (newData.child('sender').val() == 'user' || newData.child('sender').val() == 'agent')"
           }
         },
+        
         "metadata": {
-          ".write": "auth != null"
+          ".read": "auth != null || root.child('chatKeys').child($chatId).exists()",
+          ".write": "auth != null || newData.child('lastActivity').exists() || newData.child('status').exists()"
         }
       }
     },
+    
     "chatKeys": {
       "$chatId": {
-        ".read": false,
+        ".read": "auth != null",
         ".write": "auth != null"
       }
     }
