@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso de Agente</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f2f5;
+        }
+        .login-container {
+            padding: 40px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+        }
+        .login-container h1 {
+            margin-bottom: 25px;
+        }
+        .login-container input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            box-sizing: border-box; /* Asegura que el padding no afecte el ancho total */
+        }
+        .login-container button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: none;
+            background-color: var(--primary-color);
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .login-container button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: var(--error-color);
+            margin-top: 15px;
+            text-align: center;
+            min-height: 20px;
+        }
+        .toggle-form {
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--primary-color);
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-container">
+        <h1 id="formTitle">Iniciar Sesión de Agente</h1>
+        <input type="email" id="emailInput" placeholder="Correo Electrónico" required>
+        <input type="password" id="passwordInput" placeholder="Contraseña" required>
+        <button id="authButton">Acceder</button>
+        <div id="errorMessage" class="error"></div>
+        <div id="toggleForm" class="toggle-form">¿No tienes cuenta? Regístrate</div>
+    </div>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="config.js"></script>
+
+    <script>
+        firebase.initializeApp(getFirebaseConfig());
+        const auth = firebase.auth();
+
+        const emailInput = document.getElementById('emailInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const authButton = document.getElementById('authButton');
+        const errorMessage = document.getElementById('errorMessage');
+        const toggleForm = document.getElementById('toggleForm');
+        const formTitle = document.getElementById('formTitle');
+
+        let isLogin = true;
+
+        // Redirigir si el usuario ya está logueado
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                window.location.href = 'admin.html';
+            }
+        });
+
+        const handleAuth = () => {
+            const email = emailInput.value;
+            const password = passwordInput.value;
+            errorMessage.textContent = '';
+
+            if (isLogin) {
+                // Iniciar sesión
+                auth.signInWithEmailAndPassword(email, password)
+                    .then(userCredential => {
+                        console.log('Inicio de sesión exitoso:', userCredential.user);
+                        // La redirección se maneja con onAuthStateChanged
+                    })
+                    .catch(error => {
+                        errorMessage.textContent = getFirebaseErrorMessage(error);
+                    });
+            } else {
+                // Registrar nuevo usuario
+                auth.createUserWithEmailAndPassword(email, password)
+                    .then(userCredential => {
+                        console.log('Registro exitoso:', userCredential.user);
+                        // La redirección se maneja con onAuthStateChanged
+                    })
+                    .catch(error => {
+                        errorMessage.textContent = getFirebaseErrorMessage(error);
+                    });
+            }
+        };
+
+        const toggleAuthMode = () => {
+            isLogin = !isLogin;
+            formTitle.textContent = isLogin ? 'Iniciar Sesión de Agente' : 'Registrar Nuevo Agente';
+            authButton.textContent = isLogin ? 'Acceder' : 'Registrar';
+            toggleForm.textContent = isLogin ? '¿No tienes cuenta? Regístrate' : '¿Ya tienes cuenta? Inicia sesión';
+            errorMessage.textContent = '';
+        };
+
+        authButton.addEventListener('click', handleAuth);
+        toggleForm.addEventListener('click', toggleAuthMode);
+
+        function getFirebaseErrorMessage(error) {
+            switch (error.code) {
+                case 'auth/user-not-found':
+                    return 'No se encontró un usuario con ese correo.';
+                case 'auth/wrong-password':
+                    return 'La contraseña es incorrecta.';
+                case 'auth/invalid-email':
+                    return 'El formato del correo es inválido.';
+                case 'auth/weak-password':
+                    return 'La contraseña debe tener al menos 6 caracteres.';
+                case 'auth/email-already-in-use':
+                    return 'Ese correo electrónico ya está registrado.';
+                default:
+                    return 'Ocurrió un error. Inténtalo de nuevo.';
+            }
+        }
+    </script>
+
+</body>
+</html>
