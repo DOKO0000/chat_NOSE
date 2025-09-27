@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Agente - Soporte Seguro</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Iconos para una mejor interfaz -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+</head>
+<body>
+
+    <div class="dashboard-container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2><i class="fas fa-headset"></i> Soporte Seguro</h2>
+                <button id="logoutBtn" class="icon-button" title="Cerrar Sesión"><i class="fas fa-sign-out-alt"></i></button>
+            </div>
+            <button id="createChatBtn" class="new-chat-btn"><i class="fas fa-plus-circle"></i> Crear Nuevo Chat</button>
+            <div id="chatList" class="chat-list">
+                <div id="loadingChats" class="loading-state">
+                    <div class="spinner"></div>
+                    <span>Cargando chats...</span>
+                </div>
+                <div id="noChats" class="empty-state" style="display: none;">
+                    <i class="fas fa-comments"></i>
+                    <p>No hay chats activos</p>
+                    <span>Crea uno para empezar</span>
+                </div>
+            </div>
+        </div>
+        
+        <main id="mainContent" class="main-content">
+            <div id="welcomeScreen" class="welcome-screen">
+                <i class="fas fa-shield-alt"></i>
+                <h2>Bienvenido al Dashboard de Soporte Seguro</h2>
+                <p>Selecciona un chat de la lista o crea uno nuevo para comenzar a comunicarte de forma cifrada.</p>
+            </div>
+            
+            <div id="chatWindow" class="chat-window" style="display: none;">
+                <div class="chat-header">
+                    <div>
+                        <strong id="chatTitle"></strong>
+                        <div id="chatIdDisplay" class="chat-id"></div>
+                    </div>
+                    <div id="chatStatus" class="status-indicator" title="Estado del chat"></div>
+                </div>
+                <div id="messagesContainer" class="messages-container"></div>
+                <div class="input-area">
+                    <input type="text" id="messageInput" placeholder="Escribe un mensaje seguro..." disabled>
+                    <button id="sendMessageBtn" class="icon-button" disabled title="Enviar Mensaje"><i class="fas fa-paper-plane"></i></button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal para mostrar el enlace del chat -->
+    <div id="chatLinkModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2><i class="fas fa-check-circle"></i> Chat Creado Exitosamente</h2>
+            <p>Comparte este enlace seguro con el cliente:</p>
+            <div class="link-container">
+                <input type="text" id="chatLinkInput" readonly>
+                <button id="copyLinkBtn" title="Copiar al portapapeles"><i class="fas fa-copy"></i></button>
+            </div>
+            <p class="modal-info">El enlace es de un solo uso y el chat está cifrado de extremo a extremo.</p>
+        </div>
+    </div>
+
+    <!-- Firebase v9 -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <script src="config.js"></script>
+    <script src="crypto-helpers.js"></script>
+
+    <script>
+        firebase.initializeApp(getFirebaseConfig());
+        const db = firebase.database();
+        const auth = firebase.auth();
+        
+        let selectedChatId = null;
+        let messagesUnsubscribe = null;
+        let metadataUnsubscribe = null;
+
+        auth.onAuthStateChanged(user => {
+            if (!user) {
+                window.location.href = 'index.html';
+            } else {
+                initChatsListener();
+            }
+        });
+
+        const createChatBtn = document.getElementById('createChatBtn');
+        const logoutBtn = document.getElementById('logoutBtn');
+        const chatList = document.getElementById('chatList');
+        const loadingChats = document.getElementById('loadingChats');
+        const noChats = document.getElementById('noChats');
+        const welcomeScreen = document.getElementById('welcomeScreen');
+        const chatWindow = document.getElementById('chatWindow');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const chatIdDisplay = document.getElementById('chatIdDisplay');
+        const chatTitle = document.getElementById('chatTitle');
+        const chatStatus = document.getElementById('chatStatus');
+
+        createChatBtn.onclick = createNewChat;
+        logoutBtn.onclick = () => auth.signOut();
+
+        async function createNewChat() {
+            setButtonLoading(createChatBtn, true, 'Creando...');
+            
+            try {
+                const newChatRef = db.ref('chats').push();
+                const chatId = newChatRef.key;
+                
+                const chatData = {
+                    metadata: { 
+                        createdAt: firebase.database.ServerValue.TIMESTAMP, 
+                        status: 'waiting',
+                        agentId: auth.currentUser.uid
+                    },
+                };
+                
+                await newChatRef.set(chatData);
+
+                const chatLink = `${window.location.origin}/chat.html?id=${chatId}`;
+                showChatLinkModal(chatLink);
+                selectChat(chatId);
+
+            } catch (error) {
+                console.error('Error al crear chat:', error);
+                alert('No se pudo crear el chat. Intenta de nuevo.');
+            } finally {
+                setButtonLoading(createChatBtn, false, '<i class="fas fa-plus-circle"></i> Crear Nuevo Chat');
+            }
+        }
+        
+        function initChatsListener() {
+            const chatsRef = db.ref('chats').orderByChild('metadata/agentId').equalTo(auth.currentUser.uid);
+            chatsRef.on('value', (snapshot) => {
+                loadingChats.style.display = 'none';
+                const chats = snapshot.val();
+                
+                if (!chats || Object.keys(chats).length === 0) {
+                    noChats.style.display = 'flex';
+                    chatList.innerHTML = '';
+                    chatList.appendChild(loadingChats);
+                    chatList.appendChild(noChats);
+                    return;
+                }
+                
+                noChats.style.display = 'none';
+                updateChatList(chats);
+            });
+        }
+
+        function updateChatList(chats) {
+            const fragment = document.createDocumentFragment();
+            const sortedChats = Object.entries(chats).sort((a, b) => 
+                (b[1].metadata.lastActivity || 0) - (a[1].metadata.lastActivity || 0)
+            );
+
+            sortedChats.forEach(([chatId, chatData]) => {
+                const chatItem = document.createElement('div');
+                chatItem.className = 'chat-item';
+                chatItem.dataset.chatId = chatId;
+                
+                const { status = 'waiting', lastActivity, unreadByAgent = 0 } = chatData.metadata || {};
+                
+                chatItem.innerHTML = `
+                    <div class="chat-info">
+                        <span class="status-indicator status-${status}"></span>
+                        <div>
+                            <div class="chat-item-title">Chat: ${chatId.substring(0, 8)}...</div>
+                            <div class="chat-meta">${formatTime(lastActivity)}</div>
+                        </div>
+                    </div>
+                    ${unreadByAgent > 0 ? `<span class="badge">${unreadByAgent}</span>` : ''}
+                `;
+                
+                chatItem.onclick = () => selectChat(chatId);
+                if (chatId === selectedChatId) chatItem.classList.add('selected');
+                if (unreadByAgent > 0) chatItem.classList.add('unread');
+                
+                fragment.appendChild(chatItem);
+            });
+            chatList.innerHTML = ''; // Limpiar
+            chatList.appendChild(loadingChats); // Re-agregar elementos de estado
+            chatList.appendChild(noChats);
+            chatList.appendChild(fragment); // Agregar chats
+        }
+
+        function selectChat(chatId) {
+            if (selectedChatId === chatId) return;
+            
+            // Limpiar listeners anteriores para evitar fugas de memoria
+            if (messagesUnsubscribe) messagesUnsubscribe();
+            if (metadataUnsubscribe) metadataUnsubscribe();
+
+            selectedChatId = chatId;
+            
+            document.querySelectorAll('.chat-item.selected').forEach(el => el.classList.remove('selected'));
+            document.querySelector(`.chat-item[data-chat-id="${chatId}"]`)?.classList.add('selected');
+            
+            welcomeScreen.style.display = 'none';
+            chatWindow.style.display = 'flex';
+            
+            chatTitle.textContent = `Chat Activo`;
+            chatIdDisplay.textContent = `ID: ${chatId}`;
+            
+            messageInput.disabled = false;
+            sendMessageBtn.disabled = false;
+            messageInput.value = '';
+            messageInput.focus();
+            
+            loadChatMessages(chatId);
+            listenToMetadata(chatId);
+            resetUnreadCount(chatId);
+        }
+
+        function loadChatMessages(chatId) {
+            const messagesRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+            messagesUnsubscribe = messagesRef.on('value', (snapshot) => {
+                messagesContainer.innerHTML = '';
+                if (!snapshot.exists()) {
+                    messagesContainer.innerHTML = '<div class="empty-state-messages">Aún no hay mensajes.</div>';
+                    return;
+                }
+                snapshot.forEach(childSnapshot => {
+                    const msg = childSnapshot.val();
+                    addMessageToUI(msg.text, msg.sender, msg.timestamp);
+                });
+                scrollToBottom();
+            });
+        }
+        
+        function listenToMetadata(chatId) {
+            const metadataRef = db.ref(`chats/${chatId}/metadata`);
+            metadataUnsubscribe = metadataRef.on('value', (snapshot) => {
+                const metadata = snapshot.val() || {};
+                const status = metadata.status || 'waiting';
+                chatStatus.className = `status-indicator status-${status}`;
+                chatStatus.title = `Estado: ${status}`;
+            });
+        }
+
+        function addMessageToUI(encryptedText, sender, timestamp) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            let plainText;
+
+            try {
+                plainText = decryptMessage(encryptedText, selectedChatId);
+            } catch (e) {
+                plainText = "<i>[No se pudo descifrar este mensaje]</i>";
+            }
+            
+            messageDiv.innerHTML = `
+                <div class="message-content">${plainText}</div>
+                <div class="message-time">${formatTime(timestamp, true)}</div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !selectedChatId) return;
+
+            const encryptedText = encryptMessage(text, selectedChatId);
+            const timestamp = firebase.database.ServerValue.TIMESTAMP;
+            
+            const messageData = {
+                text: encryptedText,
+                sender: 'agent',
+                timestamp
+            };
+            
+            messageInput.value = '';
+            
+            try {
+                await db.ref(`chats/${selectedChatId}/messages`).push(messageData);
+                await db.ref(`chats/${selectedChatId}/metadata`).update({
+                    lastActivity: timestamp,
+                    status: 'active',
+                    unreadByUser: firebase.database.ServerValue.increment(1) // Notificar al usuario
+                });
+            } catch (error) {
+                console.error('Error al enviar mensaje:', error);
+                alert('No se pudo enviar el mensaje.');
+                messageInput.value = text; // Restaurar texto
+            }
+        }
+        
+        function resetUnreadCount(chatId) {
+            db.ref(`chats/${chatId}/metadata/unreadByAgent`).set(0);
+        }
+
+        function formatTime(timestamp, includeTime = false) {
+            if (!timestamp) return 'Nunca';
+            const date = new Date(timestamp);
+            const now = new Date();
+            const diffDays = (now.setHours(0,0,0,0) - date.setHours(0,0,0,0)) / 86400000;
+
+            if (diffDays === 0) return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+            if (diffDays === 1) return 'Ayer';
+            return date.toLocaleDateString('es-ES');
+        }
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        // --- Utilidades de UI ---
+        function setButtonLoading(button, isLoading, loadingText) {
+            button.disabled = isLoading;
+            if (isLoading) {
+                button.dataset.originalHtml = button.innerHTML;
+                button.innerHTML = `<span class="spinner-sm"></span> ${loadingText}`;
+            } else {
+                button.innerHTML = button.dataset.originalHtml || loadingText;
+            }
+        }
+        
+        // --- Lógica del Modal ---
+        const modal = document.getElementById('chatLinkModal');
+        const closeBtn = document.querySelector('.close-button');
+        const copyBtn = document.getElementById('copyLinkBtn');
+        const linkInput = document.getElementById('chatLinkInput');
+
+        function showChatLinkModal(link) {
+            linkInput.value = link;
+            modal.style.display = 'block';
+            copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+            copyBtn.disabled = false;
+        }
+
+        closeBtn.onclick = () => modal.style.display = 'none';
+        window.onclick = (event) => {
+            if (event.target == modal) modal.style.display = 'none';
+        }
+
+        copyBtn.onclick = () => {
+            navigator.clipboard.writeText(linkInput.value).then(() => {
+                copyBtn.innerHTML = '<i class="fas fa-check"></i> Copiado';
+                copyBtn.disabled = true;
+            });
+        };
+        
+        sendMessageBtn.onclick = sendMessage;
+        messageInput.onkeypress = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } };
+    </script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Soporte en Línea Seguro</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.1.1/css/all.min.css">
+</head>
+<body>
+
+    <main id="mainContent" class="main-content-centered">
+        <div id="loadingScreen" class="status-screen">
+            <div class="spinner"></div>
+            <h1>Conectando al chat seguro...</h1>
+            <p>Por favor, espera un momento.</p>
+        </div>
+
+        <div id="errorScreen" class="status-screen" style="display: none;">
+            <i class="fas fa-exclamation-triangle error-icon"></i>
+            <h1>Enlace no válido o caducado</h1>
+            <p>Asegúrate de tener el enlace correcto o solicita uno nuevo al agente de soporte.</p>
+        </div>
+
+        <div id="chatWindow" class="chat-window" style="display: none;">
+            <div class="chat-header">
+                <strong><i class="fas fa-headset"></i> Soporte al Cliente</strong>
+                <div id="connectionStatus" class="status-indicator" title="Estado de la conexión"></div>
+            </div>
+            <div id="messagesContainer" class="messages-container"></div>
+            <div class="input-area">
+                <input type="text" id="messageInput" placeholder="Escribe un mensaje seguro..." disabled>
+                <button id="sendMessageBtn" class="icon-button" disabled title="Enviar Mensaje"><i class="fas fa-paper-plane"></i></button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Firebase v9 -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+
+    <script src="config.js"></script>
+    <script src="crypto-helpers.js"></script>
+
+    <script>
+        firebase.initializeApp(getFirebaseConfig());
+        const db = firebase.database();
+
+        const loadingScreen = document.getElementById('loadingScreen');
+        const errorScreen = document.getElementById('errorScreen');
+        const chatWindow = document.getElementById('chatWindow');
+        const messagesContainer = document.getElementById('messagesContainer');
+        const messageInput = document.getElementById('messageInput');
+        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        let chatId = null;
+        let messagesUnsubscribe = null;
+
+        window.onload = () => {
+            const params = new URLSearchParams(window.location.search);
+            chatId = params.get('id');
+
+            if (!chatId) {
+                showError();
+            } else {
+                validateChatExists();
+            }
+        };
+
+        async function validateChatExists() {
+            try {
+                const snapshot = await db.ref(`chats/${chatId}/metadata`).once('value');
+                if (snapshot.exists()) {
+                    initializeChat();
+                } else {
+                    showError();
+                }
+            } catch (error) {
+                console.error('Error de validación:', error);
+                showError('No se pudo conectar. Revisa tu conexión a internet.');
+            }
+        }
+
+        function initializeChat() {
+            loadingScreen.style.display = 'none';
+            chatWindow.style.display = 'flex';
+            
+            messageInput.disabled = false;
+            sendMessageBtn.disabled = false;
+            messageInput.focus();
+
+            const messagesRef = db.ref(`chats/${chatId}/messages`).orderByChild('timestamp');
+            messagesUnsubscribe = messagesRef.on('value', (snapshot) => {
+                messagesContainer.innerHTML = '';
+                 if (!snapshot.exists()) {
+                    messagesContainer.innerHTML = '<div class="empty-state-messages">¡Hola! Envía un mensaje para empezar.</div>';
+                    return;
+                }
+                snapshot.forEach(childSnapshot => {
+                    const msg = childSnapshot.val();
+                    addMessageToUI(msg.text, msg.sender, msg.timestamp);
+                });
+                scrollToBottom();
+            });
+            
+            // Marcar mensajes como leídos
+            db.ref(`chats/${chatId}/metadata/unreadByUser`).set(0);
+
+            // Actualizar estado a activo
+            db.ref(`chats/${chatId}/metadata`).update({
+                status: 'active'
+            });
+
+            setupConnectionMonitoring();
+        }
+
+        function addMessageToUI(encryptedText, sender, timestamp) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            let plainText;
+
+            try {
+                plainText = decryptMessage(encryptedText, chatId);
+            } catch (e) {
+                plainText = "<i>[No se pudo descifrar este mensaje]</i>";
+            }
+
+            messageDiv.innerHTML = `
+                <div class="message-content">${plainText}</div>
+                <div class="message-time">${formatTime(timestamp)}</div>
+            `;
+            messagesContainer.appendChild(messageDiv);
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+            if (!text || !chatId) return;
+
+            const encryptedText = encryptMessage(text, chatId);
+            const timestamp = firebase.database.ServerValue.TIMESTAMP;
+            
+            const messageData = {
+                text: encryptedText,
+                sender: 'user',
+                timestamp
+            };
+            
+            messageInput.value = '';
+            
+            try {
+                await db.ref(`chats/${chatId}/messages`).push(messageData);
+                await db.ref(`chats/${chatId}/metadata`).update({
+                    lastActivity: timestamp,
+                    status: 'active',
+                    unreadByAgent: firebase.database.ServerValue.increment(1) // Notificar al agente
+                });
+            } catch (error) {
+                console.error('Error al enviar mensaje:', error);
+                alert('No se pudo enviar el mensaje.');
+                messageInput.value = text;
+            }
+        }
+        
+        function setupConnectionMonitoring() {
+            const connectedRef = db.ref(".info/connected");
+            connectedRef.on("value", (snap) => {
+                const isConnected = snap.val() === true;
+                connectionStatus.className = `status-indicator ${isConnected ? 'status-active' : 'status-waiting'}`;
+                connectionStatus.title = isConnected ? 'Conectado' : 'Reconectando...';
+            });
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return '';
+            return new Date(timestamp).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        function scrollToBottom() {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showError(message) {
+            loadingScreen.style.display = 'none';
+            errorScreen.style.display = 'flex';
+            if(message) errorScreen.querySelector('p').textContent = message;
+        }
+
+        sendMessageBtn.onclick = sendMessage;
+        messageInput.onkeypress = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }};
+    </script>
+</body>
+</html>

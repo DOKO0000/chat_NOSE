@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso de Agente - Soporte Seguro</title>
+    <!-- Se unifican los estilos en un solo lugar para mejor mantenimiento -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="auth-container">
+        <div class="auth-card">
+            <h1 id="formTitle">Iniciar Sesión de Agente</h1>
+            <p class="auth-subtitle">Accede para gestionar tus chats de soporte.</p>
+            
+            <div class="input-group">
+                <label for="emailInput">Correo Electrónico</label>
+                <input type="email" id="emailInput" placeholder="tu@email.com" required>
+            </div>
+
+            <div class="input-group">
+                <label for="passwordInput">Contraseña</label>
+                <input type="password" id="passwordInput" placeholder="••••••••" required>
+            </div>
+
+            <button id="authButton" class="auth-button">Acceder</button>
+            <div id="errorMessage" class="error"></div>
+            
+            <p id="toggleForm" class="toggle-form">¿No tienes cuenta? <a>Regístrate</a></p>
+            
+            <div id="loadingMessage" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <span>Procesando...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase v9 (SDK modular) para mejor rendimiento y nuevas características -->
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth-compat.js"></script>
+    
+    <script src="config.js"></script>
+
+    <script>
+        // Inicializar Firebase
+        firebase.initializeApp(getFirebaseConfig());
+        const auth = firebase.auth();
+
+        // Elementos del DOM
+        const emailInput = document.getElementById('emailInput');
+        const passwordInput = document.getElementById('passwordInput');
+        const authButton = document.getElementById('authButton');
+        const errorMessage = document.getElementById('errorMessage');
+        const toggleForm = document.getElementById('toggleForm');
+        const formTitle = document.getElementById('formTitle');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        let isLogin = true;
+
+        // Verificar estado de autenticación en tiempo real
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                console.log('Usuario autenticado:', user.email);
+                // Redirección a admin.html
+                window.location.href = 'admin.html';
+            } else {
+                console.log('No hay usuario autenticado.');
+            }
+        });
+
+        // Manejar autenticación (Login / Registro)
+        const handleAuth = async () => {
+            const email = emailInput.value.trim();
+            const password = passwordInput.value.trim();
+            
+            if (!email || !password) {
+                showError('Por favor, completa todos los campos.');
+                return;
+            }
+            if (password.length < 6) {
+                showError('La contraseña debe tener al menos 6 caracteres.');
+                return;
+            }
+
+            setLoading(true);
+            errorMessage.textContent = '';
+
+            try {
+                if (isLogin) {
+                    await auth.signInWithEmailAndPassword(email, password);
+                } else {
+                    await auth.createUserWithEmailAndPassword(email, password);
+                }
+                // La redirección es manejada por onAuthStateChanged
+            } catch (error) {
+                showError(getFirebaseErrorMessage(error));
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        // Cambiar entre modo login y registro
+        const toggleAuthMode = () => {
+            isLogin = !isLogin;
+            formTitle.textContent = isLogin ? 'Iniciar Sesión de Agente' : 'Registrar Nuevo Agente';
+            authButton.textContent = isLogin ? 'Acceder' : 'Registrar';
+            toggleForm.innerHTML = isLogin ? '¿No tienes cuenta? <a>Regístrate</a>' : '¿Ya tienes cuenta? <a>Inicia sesión</a>';
+            errorMessage.textContent = '';
+            emailInput.value = '';
+            passwordInput.value = '';
+            emailInput.focus();
+        };
+
+        // Control del estado de carga
+        const setLoading = (isLoading) => {
+            authButton.disabled = isLoading;
+            loadingMessage.style.display = isLoading ? 'flex' : 'none';
+            authButton.textContent = isLoading ? (isLogin ? 'Accediendo...' : 'Registrando...') : (isLogin ? 'Acceder' : 'Registrar');
+        };
+
+        // Mostrar errores de forma clara
+        const showError = (message) => {
+            errorMessage.textContent = message;
+        };
+
+        // Mapeo de errores de Firebase a mensajes amigables
+        const getFirebaseErrorMessage = (error) => {
+            switch (error.code) {
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                    return 'Correo o contraseña incorrectos.';
+                case 'auth/invalid-email':
+                    return 'El formato del correo es inválido.';
+                case 'auth/weak-password':
+                    return 'La contraseña es muy débil (mínimo 6 caracteres).';
+                case 'auth/email-already-in-use':
+                    return 'Este correo electrónico ya está en uso.';
+                case 'auth/network-request-failed':
+                    return 'Error de red. Revisa tu conexión a internet.';
+                case 'auth/too-many-requests':
+                    return 'Demasiados intentos. Intenta de nuevo más tarde.';
+                default:
+                    return 'Ocurrió un error inesperado.';
+            }
+        };
+
+        // Event Listeners
+        authButton.addEventListener('click', handleAuth);
+        toggleForm.addEventListener('click', toggleAuthMode);
+        passwordInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleAuth();
+        });
+
+        window.addEventListener('load', () => {
+            emailInput.focus();
+        });
+    </script>
+</body>
+</html>

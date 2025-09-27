@@ -1,0 +1,42 @@
+{
+  "rules": {
+    "chats": {
+      "$chatId": {
+        // Lectura: solo agentes autenticados que crearon el chat o usuarios con el enlace correcto (implicado por la escritura)
+        ".read": "auth != null && root.child('chats').child($chatId).child('metadata').child('agentId').val() == auth.uid",
+        
+        // Escritura: solo para metadatos, controlada por reglas más específicas abajo
+        ".write": false,
+
+        "metadata": {
+          // Creación de metadatos: solo por un agente autenticado
+          ".write": "auth != null && !data.exists()",
+          // Actualización de metadatos: por el agente creador o por el usuario (para estado y contadores)
+          ".validate": "newData.hasChildren(['createdAt', 'status', 'agentId'])",
+          
+          "status": { ".write": true },
+          "lastActivity": { ".write": true },
+          "unreadByAgent": { ".write": true },
+          "unreadByUser": { ".write": "auth != null && root.child('chats').child($chatId).child('metadata').child('agentId').val() == auth.uid" }
+        },
+        
+        "messages": {
+          // Cualquiera puede leer los mensajes si tiene el ID (el ID es el secreto), pero solo agentes pueden listar chats.
+          ".read": true, 
+          "$messageId": {
+            // Escritura: Agente creador o usuario anónimo (cliente)
+            ".write": "(auth != null && newData.child('sender').val() == 'agent' && root.child('chats').child($chatId).child('metadata').child('agentId').val() == auth.uid) || (auth == null && newData.child('sender').val() == 'user')",
+            ".validate": "newData.hasChildren(['text', 'sender', 'timestamp']) && newData.child('sender').val().matches(/^(user|agent)$/)"
+          }
+        }
+      }
+    },
+    // Nodo para usuarios (futura expansión)
+    "users": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}
