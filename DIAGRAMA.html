@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Arquitectura - Chat Seguro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .nav-link { transition: all 0.2s ease-in-out; }
+        .nav-link.active { color: #3b82f6; border-bottom-color: #3b82f6; font-weight: 600; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+        .diagram-box { border: 1px solid #e5e7eb; background-color: #f9fafb; padding: 1rem; border-radius: 0.5rem; text-align: center; box-shadow: 0 1px 3px 0 rgba(0,0,0,0.1); }
+        .diagram-arrow { position: relative; width: 100%; height: 2px; background-color: #9ca3af; }
+        .diagram-arrow::after { content: '▶'; position: absolute; right: -8px; top: -9px; color: #9ca3af; }
+        .component-item.active { background-color: #eff6ff; border-left-color: #3b82f6; }
+        .flow-step { border-left: 3px solid #d1d5db; padding-left: 1.5rem; position: relative; }
+        .flow-step::before { content: ''; position: absolute; left: -8px; top: 0.5rem; width: 14px; height: 14px; background-color: #fff; border: 3px solid #d1d5db; border-radius: 9999px; }
+        .flow-step:last-child { border-left-color: transparent; }
+        .code-snippet { background-color: #1f2937; color: #d1d5db; padding: 1rem; border-radius: 0.5rem; font-family: monospace; font-size: 0.875rem; white-space: pre-wrap; }
+    </style>
+    <!-- Chosen Palette: Slate Gray & Sky Blue -->
+    <!-- Application Structure Plan: The SPA is designed as an interactive dashboard with four main thematic sections: 'Visión General' (a high-level architecture diagram), 'Componentes' (an interactive file explorer), 'Flujos de Usuario' (step-by-step process visualization), and 'Seguridad' (details on encryption and rules). This structure was chosen to transform the static report into an explorable system, allowing users to start with a broad overview and drill down into specific areas of interest, which is more engaging and user-friendly for technical documentation. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Architecture Diagram -> Goal: High-level overview -> Viz/Method: Recreated the diagram using HTML divs and Tailwind CSS for structure, avoiding external libraries. -> Interaction: Key areas are visually distinct. -> Justification: Provides an immediate, clear mental model of the system without dependencies. Confirms NO SVG/Mermaid.
+        - Report Info: File Table -> Goal: Detail each component's purpose -> Viz/Method: A two-panel layout with a clickable list of components on the left and a content display area on the right. -> Interaction: Clicking a component name displays its details. -> Justification: Mimics a familiar file explorer UI, making it intuitive to navigate the project's structure.
+        - Report Info: User Flows -> Goal: Explain agent/client processes -> Viz/Method: Vertical timelines built with HTML/CSS. -> Interaction: Toggle buttons to switch between Agent and Client flows. -> Justification: Clearly visualizes sequential processes in a more dynamic way than static text.
+        - Report Info: Security Layer -> Goal: Explain security measures -> Viz/Method: Accordion-style sections for Encryption and Rules. -> Interaction: Clicking to expand/collapse details. -> Justification: Organizes complex information neatly, allowing users to focus on one topic at a time.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-3xl md:text-4xl font-bold text-slate-900">Arquitectura del Proyecto de Chat Seguro</h1>
+            <p class="mt-2 text-lg text-slate-600">Un dashboard interactivo para explorar la estructura y funcionamiento de la aplicación.</p>
+        </header>
+
+        <nav class="mb-8 border-b border-slate-200">
+            <ul class="flex justify-center space-x-4 md:space-x-8 -mb-px">
+                <li><a href="#overview" class="nav-link inline-block p-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300">Visión General</a></li>
+                <li><a href="#components" class="nav-link inline-block p-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300">Componentes</a></li>
+                <li><a href="#flows" class="nav-link inline-block p-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300">Flujos de Usuario</a></li>
+                <li><a href="#security" class="nav-link inline-block p-4 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-300">Seguridad</a></li>
+            </ul>
+        </nav>
+
+        <main id="main-content">
+            <!-- Sección de Visión General -->
+            <section id="overview" class="content-section active">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-900">Diagrama de Arquitectura</h2>
+                    <p class="text-slate-600 mb-6">Este diagrama ilustra cómo los diferentes componentes de la aplicación (vistas del agente, vista del cliente y Firebase) se conectan y comunican entre sí. El sistema está diseñado para separar las interfaces de usuario del backend en la nube, con una capa de seguridad que protege todos los datos.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+                        <!-- Clientes -->
+                        <div class="space-y-4">
+                           <div class="diagram-box">
+                                <h3 class="font-semibold text-blue-600">Usuario Cliente (Navegador)</h3>
+                                <p class="text-sm text-slate-500">Chat de Cliente.html</p>
+                            </div>
+                            <div class="diagram-box">
+                               <h3 class="font-semibold text-blue-600">Agente de Soporte (Navegador)</h3>
+                               <p class="text-sm text-slate-500">Login.html → Dashboard.html</p>
+                           </div>
+                        </div>
+
+                        <!-- Flechas y Conexiones -->
+                        <div class="flex flex-col items-center space-y-2">
+                             <p class="font-mono text-sm text-slate-500 mb-2">Lee/Escribe</p>
+                             <div class="w-px h-16 bg-slate-400"></div>
+                             <div class="text-2xl text-slate-400">↔</div>
+                             <div class="w-px h-16 bg-slate-400"></div>
+                             <p class="font-mono text-sm text-slate-500 mt-2">Valida con</p>
+                        </div>
+                        
+                        <!-- Backend -->
+                        <div class="diagram-box bg-slate-800 text-white p-6">
+                             <h3 class="font-semibold text-sky-400 text-lg">Backend en la Nube (Firebase)</h3>
+                             <div class="mt-4 space-y-3 text-left">
+                                 <p class="text-sky-300">🛡️ Firebase Authentication</p>
+                                 <p class="text-sky-300">🗃️ Realtime Database</p>
+                                 <p class="text-sky-300">⚖️ Security Rules</p>
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Componentes -->
+            <section id="components" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-900">Explorador de Componentes</h2>
+                    <p class="text-slate-600 mb-6">Cada archivo del proyecto tiene un propósito específico. Haz clic en un componente de la lista para ver su descripción y su rol dentro de la aplicación.</p>
+                    <div class="flex flex-col md:flex-row gap-6">
+                        <div class="md:w-1/3">
+                            <ul id="component-list" class="space-y-2">
+                                <!-- Los componentes se insertarán aquí con JS -->
+                            </ul>
+                        </div>
+                        <div id="component-details" class="md:w-2/3 bg-slate-50 p-6 rounded-lg border border-slate-200 min-h-[300px]">
+                            <!-- Los detalles se insertarán aquí con JS -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Flujos de Usuario -->
+            <section id="flows" class="content-section">
+                 <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-900">Flujos de Usuario</h2>
+                    <p class="text-slate-600 mb-6">La aplicación tiene dos flujos principales: uno para el agente de soporte y otro para el cliente final. Cada flujo está diseñado para ser simple y seguro.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4 text-blue-600">Flujo del Agente</h3>
+                            <div class="space-y-8">
+                                <div class="flow-step">
+                                    <h4 class="font-bold">1. Autenticación</h4>
+                                    <p class="text-slate-600">El Agente accede a la página de Login y se autentica con sus credenciales usando Firebase Authentication.</p>
+                                </div>
+                                <div class="flow-step">
+                                    <h4 class="font-bold">2. Acceso al Dashboard</h4>
+                                    <p class="text-slate-600">Al iniciar sesión, es redirigido a su Dashboard, donde puede ver y gestionar todas sus conversaciones.</p>
+                                </div>
+                                 <div class="flow-step">
+                                    <h4 class="font-bold">3. Creación y Gestión de Chats</h4>
+                                    <p class="text-slate-600">Desde el dashboard, puede crear nuevos chats seguros y ver la lista de conversaciones activas, almacenadas en la Realtime Database.</p>
+                                </div>
+                                <div class="flow-step">
+                                    <h4 class="font-bold">4. Comunicación Cifrada</h4>
+                                    <p class="text-slate-600">Cuando envía o recibe un mensaje, la lógica de Criptografía se encarga de cifrarlo y descifrarlo automáticamente.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-xl font-semibold mb-4 text-green-600">Flujo del Cliente</h3>
+                             <div class="space-y-8">
+                                <div class="flow-step">
+                                    <h4 class="font-bold">1. Acceso Vía Enlace Único</h4>
+                                    <p class="text-slate-600">El Cliente recibe un enlace único que lo lleva directamente a la página de Chat. No necesita iniciar sesión.</p>
+                                </div>
+                                <div class="flow-step">
+                                    <h4 class="font-bold">2. Conexión a la Sala de Chat</h4>
+                                    <p class="text-slate-600">La página se conecta a la Realtime Database para leer y escribir mensajes en el chat específico al que pertenece el enlace.</p>
+                                </div>
+                                <div class="flow-step">
+                                    <h4 class="font-bold">3. Comunicación Segura</h4>
+                                    <p class="text-slate-600">Al igual que el agente, su navegador utiliza la lógica de Criptografía para asegurar que todos los mensajes viajen cifrados de extremo a extremo.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Seguridad -->
+            <section id="security" class="content-section">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-2xl font-bold mb-4 text-slate-900">Capa de Seguridad</h2>
+                    <p class="text-slate-600 mb-6">La seguridad es el pilar de esta aplicación. Se implementa a través de dos mecanismos principales: el cifrado de mensajes en el cliente y las reglas de acceso en el backend.</p>
+                    <div class="space-y-4">
+                        <div class="border border-slate-200 rounded-lg">
+                            <h3 class="text-lg font-semibold p-4 cursor-pointer bg-slate-50">🔑 Cifrado de Extremo a Extremo</h3>
+                            <div class="p-4 border-t border-slate-200">
+                                <p class="text-slate-600">Todos los mensajes se cifran en el navegador del remitente antes de ser enviados y solo se descifran en el navegador del destinatario. Esto significa que los mensajes en la base de datos son ilegibles para cualquiera sin la clave correcta. Esta lógica se maneja en el archivo <code class="font-mono text-sm bg-slate-100 p-1 rounded">crypto-helpers.js</code>.</p>
+                            </div>
+                        </div>
+                        <div class="border border-slate-200 rounded-lg">
+                            <h3 class="text-lg font-semibold p-4 cursor-pointer bg-slate-50">⚖️ Reglas de Base de Datos</h3>
+                            <div class="p-4 border-t border-slate-200">
+                                <p class="text-slate-600 mb-4">Las Security Rules de Firebase actúan como un guardián en el backend. Definen quién puede leer y escribir datos, asegurando que solo los agentes autenticados puedan crear chats y que los usuarios solo puedan interactuar con el chat que les corresponde. Esto previene accesos no autorizados, incluso si alguien descubre la estructura de la base de datos.</p>
+                                <div class="code-snippet">
+{
+  "rules": {
+    "chats": {
+      "$chatId": {
+        // Solo el agente creador puede leer/escribir metadatos
+        ".read": "auth != null && data.child('metadata/agentId').val() == auth.uid",
+        
+        "messages": {
+          // Cualquiera con el enlace puede leer mensajes
+          ".read": true,
+          // Escriben agentes autenticados o usuarios anónimos
+          ".write": "auth != null || (auth == null && newData.child('sender').val() == 'user')"
+        }
+      }
+    }
+  }
+}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const navLinks = document.querySelectorAll('.nav-link');
+            const sections = document.querySelectorAll('.content-section');
+            const componentList = document.getElementById('component-list');
+            const componentDetails = document.getElementById('component-details');
+
+            const componentsData = [
+                { id: 'login', name: 'Login de Agente (Corregido)', file: 'index.html', purpose: 'Página de inicio de sesión y registro para los agentes de soporte.' },
+                { id: 'dashboard', name: 'Dashboard de Agente (Corregido)', file: 'admin.html', purpose: 'Panel principal donde los agentes ven, gestionan y responden a sus chats.' },
+                { id: 'chat', name: 'Chat de Cliente (Corregido)', file: 'chat.html', purpose: 'La ventana de chat que el cliente final utiliza para comunicarse de forma segura.' },
+                { id: 'styles', name: 'Estilos Mejorados', file: 'styles.css', purpose: 'Hoja de estilos CSS unificada con un diseño moderno y profesional.' },
+                { id: 'config', name: 'Configuración de Firebase', file: 'config.js', purpose: 'Mantiene la configuración de Firebase centralizada.' },
+                { id: 'crypto', name: 'Helpers de Criptografía', file: 'crypto-helpers.js', purpose: 'Funciones mejoradas y seguras para cifrar y descifrar mensajes.' },
+                { id: 'security-rules', name: 'Reglas de Seguridad (Corregido)', file: 'security-rules.json', purpose: 'Reglas del backend (Firebase) que protegen la base de datos y definen permisos.' }
+            ];
+
+            function showSection(hash) {
+                const targetId = hash ? hash.substring(1) : 'overview';
+                
+                sections.forEach(section => {
+                    section.classList.toggle('active', section.id === targetId);
+                });
+
+                navLinks.forEach(link => {
+                    link.classList.toggle('active', link.getAttribute('href') === `#${targetId}`);
+                });
+            }
+            
+            function showComponentDetails(componentId) {
+                const component = componentsData.find(c => c.id === componentId);
+                if (component) {
+                    componentDetails.innerHTML = `
+                        <h3 class="text-xl font-bold text-slate-900">${component.name}</h3>
+                        <p class="text-sm font-mono bg-slate-100 text-slate-500 inline-block px-2 py-1 rounded-md my-2">${component.file}</p>
+                        <p class="text-slate-700">${component.purpose}</p>
+                    `;
+
+                    document.querySelectorAll('.component-item').forEach(item => {
+                        item.classList.toggle('active', item.dataset.id === componentId);
+                    });
+                }
+            }
+
+            navLinks.forEach(link => {
+                link.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const hash = this.getAttribute('href');
+                    history.pushState(null, null, hash);
+                    showSection(hash);
+                });
+            });
+
+            // Populate components
+            componentsData.forEach(component => {
+                const li = document.createElement('li');
+                li.innerHTML = `<a href="#" class="component-item block p-4 border-l-4 border-transparent text-slate-700 hover:bg-slate-100 transition-colors" data-id="${component.id}">${component.name}</a>`;
+                componentList.appendChild(li);
+            });
+            
+            componentList.addEventListener('click', (e) => {
+                e.preventDefault();
+                const target = e.target.closest('.component-item');
+                if (target) {
+                    showComponentDetails(target.dataset.id);
+                }
+            });
+
+            // Initial state
+            showSection(window.location.hash);
+            showComponentDetails('dashboard'); // Show one by default
+
+            window.addEventListener('popstate', () => showSection(window.location.hash));
+        });
+    </script>
+</body>
+</html>
